@@ -1,0 +1,54 @@
+name: Build Mini Clone Virtual APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/miniclone-virtual.yml'
+      - 'scripts/patch_virtualapp.py'
+      - 'patches/MiniCloneActivity.java'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout customization kit
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install SDK and NDK dependencies
+        run: |
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;21.4.7075529"
+
+      - name: Fetch VirtualApp source
+        run: git clone --depth 1 https://github.com/ISEKHON/VirtualApp.git upstream
+
+      - name: Apply Mini Clone Lite UI
+        run: python3 scripts/patch_virtualapp.py
+
+      - name: Build APKs
+        working-directory: upstream
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Upload universal APK (both ARM architectures)
+        uses: actions/upload-artifact@v4
+        with:
+          name: MiniCloneLite-Virtual-Note8-APK
+          path: upstream/app/build/outputs/apk/debug/MiniCloneLite-*-universal.apk
+          if-no-files-found: error
+          retention-days: 14
